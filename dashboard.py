@@ -1,704 +1,86 @@
-import os
-import pickle
-import numpy as np
-import pandas as pd
-import streamlit as st
-import matplotlib.pyplot as plt
-
-st.set_page_config(
-    page_title="Predictive Maintenance System",
-    page_icon="⚙️",
-    layout="wide"
-)
-
-#Title of the dashboard
-st.title("⚙️ Predictive Maintenance System")
-
-st.write(
-    """
-    This dashboard uses machine learning to predict machine failure
-    from sensor parameters and provide a maintenance recommendation.
-    """
-)
-
-MODEL_PATH = (
-    "models/predictive_maintenance_model.pkl"
-)
-
-DATASET_PATH = "ai4i2020.csv"
-
-if not os.path.exists(MODEL_PATH):
-
-    st.error(
-        """
-        Trained model not found.
-
-        Please run:
-
-        python predictive_maintenance.py
-        """
-    )
-
-    st.stop()
-
-
-with open(MODEL_PATH, "rb") as file:
-
-    model = pickle.load(file)
-
-if not os.path.exists(DATASET_PATH):
-
-    st.error(
-        "ai4i2020.csv was not found."
-    )
-
-    st.stop()
-
-
-df = pd.read_csv(
-    DATASET_PATH
-)
-DATASET_RANGES = {
-
-    "Air temperature [K]": (
-        df["Air temperature [K]"].min(),
-        df["Air temperature [K]"].max()
-    ),
-
-    "Process temperature [K]": (
-        df["Process temperature [K]"].min(),
-        df["Process temperature [K]"].max()
-    ),
-
-    "Rotational speed [rpm]": (
-        df["Rotational speed [rpm]"].min(),
-        df["Rotational speed [rpm]"].max()
-    ),
-
-    "Torque [Nm]": (
-        df["Torque [Nm]"].min(),
-        df["Torque [Nm]"].max()
-    ),
-
-    "Tool wear [min]": (
-        df["Tool wear [min]"].min(),
-        df["Tool wear [min]"].max()
-    )
-}
-type_mapping = {
-    "L": 0,
-    "M": 1,
-    "H": 2
-}
-
-def maintenance_recommendation(
-    failure_probability,
-    tool_wear,
-    air_temperature,
-    process_temperature,
-    torque,
-    rotational_speed
-):
-
-    warnings = []
-
-    temperature_difference = (
-        process_temperature - air_temperature
-    )
-
-    if temperature_difference > 10:
-
-        warnings.append(
-            "High temperature difference detected."
-        )
-
-    if torque > 50:
-
-        warnings.append(
-            "High torque detected."
-        )
-
-    if rotational_speed < 1200:
-
-        warnings.append(
-            "Low rotational speed detected."
-        )
-
-    if tool_wear >= 200:
-
-        warnings.append(
-            "Critical tool wear."
-        )
-
-    elif tool_wear >= 150:
-
-        warnings.append(
-            "High tool wear."
-        )
-
-    elif tool_wear >= 100:
-
-        warnings.append(
-            "Moderate tool wear."
-        )
-
-
-    if (
-        failure_probability >= 0.75
-        or tool_wear >= 200
-    ):
-
-        status = (
-            "IMMEDIATE MAINTENANCE REQUIRED"
-        )
-
-        estimated_hours = 0
-
-
-    elif (
-        failure_probability >= 0.50
-        or tool_wear >= 150
-    ):
-
-        status = (
-            "MAINTENANCE REQUIRED SOON"
-        )
-
-        estimated_hours = 10
-
-
-    elif (
-        failure_probability >= 0.25
-        or tool_wear >= 100
-    ):
-
-        status = (
-            "MAINTENANCE SHOULD BE SCHEDULED"
-        )
-
-        estimated_hours = 25
-
-
-    else:
-
-        status = (
-            "MACHINE CONDITION NORMAL"
-        )
-
-        estimated_hours = 50
-
-
-    return (
-        status,
-        estimated_hours,
-        warnings
-    )
-
-st.header("🔧 Machine Sensor Inputs")
-
-st.write(
-    "Enter the current machine operating parameters."
-)
-
-
-col1, col2, col3 = st.columns(3)
-
-
-# Machine Type
-with col1:
-
-    machine_type = st.selectbox(
-        "Machine Type",
-        ["L", "M", "H"]
-    )
-
-    st.caption(
-        "L = Low, M = Medium, H = High"
-    )
-
-
-# Air Temperature
-with col2:
-
-    air_min, air_max = (
-        DATASET_RANGES[
-            "Air temperature [K]"
-        ]
-    )
-
-    air_temperature = st.number_input(
-        "Air Temperature [K]",
-        min_value=float(
-            round(air_min, 1)
-        ),
-        max_value=float(
-            round(air_max, 1)
-        ),
-        value=float(
-            round(
-                df[
-                    "Air temperature [K]"
-                ].mean(),
-                1
-            )
-        ),
-        step=0.1
-    )
-
-    st.caption(
-        f"Dataset range: {air_min:.1f} - {air_max:.1f} K"
-    )
-
-
-# Process Temperature
-with col3:
-
-    process_min, process_max = (
-        DATASET_RANGES[
-            "Process temperature [K]"
-        ]
-    )
-
-    process_temperature = st.number_input(
-        "Process Temperature [K]",
-        min_value=float(
-            round(process_min, 1)
-        ),
-        max_value=float(
-            round(process_max, 1)
-        ),
-        value=float(
-            round(
-                df[
-                    "Process temperature [K]"
-                ].mean(),
-                1
-            )
-        ),
-        step=0.1
-    )
-
-    st.caption(
-        f"Dataset range: {process_min:.1f} - {process_max:.1f} K"
-    )
-
-
-col4, col5, col6 = st.columns(3)
-
-
-# Rotational Speed
-with col4:
-
-    speed_min, speed_max = (
-        DATASET_RANGES[
-            "Rotational speed [rpm]"
-        ]
-    )
-
-    rotational_speed = st.number_input(
-        "Rotational Speed [rpm]",
-        min_value=float(
-            round(speed_min, 0)
-        ),
-        max_value=float(
-            round(speed_max, 0)
-        ),
-        value=float(
-            round(
-                df[
-                    "Rotational speed [rpm]"
-                ].mean(),
-                0
-            )
-        ),
-        step=1.0
-    )
-
-    st.caption(
-        f"Dataset range: {speed_min:.0f} - {speed_max:.0f} rpm"
-    )
-
-
-# Torque
-with col5:
-
-    torque_min, torque_max = (
-        DATASET_RANGES[
-            "Torque [Nm]"
-        ]
-    )
-
-    torque = st.number_input(
-        "Torque [Nm]",
-        min_value=float(
-            round(torque_min, 1)
-        ),
-        max_value=float(
-            round(torque_max, 1)
-        ),
-        value=float(
-            round(
-                df[
-                    "Torque [Nm]"
-                ].mean(),
-                1
-            )
-        ),
-        step=0.1
-    )
-
-    st.caption(
-        f"Dataset range: {torque_min:.1f} - {torque_max:.1f} Nm"
-    )
-
-
-# Tool Wear
-with col6:
-
-    wear_min, wear_max = (
-        DATASET_RANGES[
-            "Tool wear [min]"
-        ]
-    )
-
-    tool_wear = st.number_input(
-        "Tool Wear [min]",
-        min_value=float(
-            round(wear_min, 0)
-        ),
-        max_value=float(
-            round(wear_max, 0)
-        ),
-        value=float(
-            round(
-                df[
-                    "Tool wear [min]"
-                ].mean(),
-                0
-            )
-        ),
-        step=1.0
-    )
-
-    st.caption(
-        f"Dataset range: {wear_min:.0f} - {wear_max:.0f} min"
-    )
-
-st.subheader("Current Sensor Values")
-
-sensor_table = pd.DataFrame({
-
-    "Parameter": [
-        "Machine Type",
-        "Air Temperature",
-        "Process Temperature",
-        "Rotational Speed",
-        "Torque",
-        "Tool Wear"
-    ],
-
-    "Value": [
-        machine_type,
-        f"{air_temperature:.1f} K",
-        f"{process_temperature:.1f} K",
-        f"{rotational_speed:.0f} rpm",
-        f"{torque:.1f} Nm",
-        f"{tool_wear:.0f} min"
-    ]
-})
-
-st.dataframe(
-    sensor_table,
-    use_container_width=True,
-    hide_index=True
-)
-
-st.divider()
-
-predict_button = st.button(
-    "🔍 Predict Machine Condition",
-    type="primary",
-    use_container_width=True
-)
-
-if predict_button:
-
-    type_value = type_mapping[
-        machine_type
-    ]
-
-    input_data = pd.DataFrame(
-
-        [[
-            type_value,
-            air_temperature,
-            process_temperature,
-            rotational_speed,
-            torque,
-            tool_wear
-        ]],
-
-        columns=[
-            "Type",
-            "Air temperature [K]",
-            "Process temperature [K]",
-            "Rotational speed [rpm]",
-            "Torque [Nm]",
-            "Tool wear [min]"
-        ]
-    )
-
-
-    # Prediction
-    prediction = model.predict(
-        input_data
-    )[0]
-
-
-    # Probability
-    probability = model.predict_proba(
-        input_data
-    )[0][1]
-
-
-    # Maintenance
-    status, estimated_hours, warnings = (
-        maintenance_recommendation(
-            probability,
-            tool_wear,
-            air_temperature,
-            process_temperature,
-            torque,
-            rotational_speed
-        )
-    )
-
-    st.header("📊 Prediction Result")
-
-    result_col1, result_col2, result_col3 = (
-        st.columns(3)
-    )
-
-
-    with result_col1:
-
-        if prediction == 1:
-
-            st.error(
-                "⚠️ MACHINE FAILURE DETECTED"
-            )
-
-        else:
-
-            st.success(
-                "✅ MACHINE CONDITION NORMAL"
-            )
-
-
-    with result_col2:
-
-        st.metric(
-            "Failure Probability",
-            f"{probability * 100:.2f}%"
-        )
-
-
-    with result_col3:
-
-        if estimated_hours == 0:
-
-            st.metric(
-                "Maintenance",
-                "IMMEDIATE"
-            )
-
-        else:
-
-            st.metric(
-                "Maintenance Estimate",
-                f"{estimated_hours} hours"
-            )
-    st.subheader(
-        "🔧 Maintenance Assessment"
-    )
-
-    if (
-        status ==
-        "IMMEDIATE MAINTENANCE REQUIRED"
-    ):
-
-        st.error(status)
-
-    elif (
-        status ==
-        "MAINTENANCE REQUIRED SOON"
-    ):
-
-        st.warning(status)
-
-    elif (
-        status ==
-        "MAINTENANCE SHOULD BE SCHEDULED"
-    ):
-
-        st.info(status)
-
-    else:
-
-        st.success(status)
-
-    st.subheader(
-        "⚠️ Sensor Warnings"
-    )
-
-    if len(warnings) == 0:
-
-        st.success(
-            "No major sensor warning detected."
-        )
-
-    else:
-
-        for warning in warnings:
-
-            st.warning(
-                warning
-            )
-
-    st.subheader(
-        "Failure Probability"
-    )
-
-    probability_data = pd.DataFrame({
-
-        "Condition": [
-            "No Failure",
-            "Failure"
-        ],
-
-        "Probability": [
-            1 - probability,
-            probability
-        ]
-    })
-
-    st.bar_chart(
-        probability_data.set_index(
-            "Condition"
-        )
-    )
-
-    st.subheader(
-        "Tool Wear Analysis"
-    )
-
-    wear_data = pd.DataFrame({
-
-        "Tool Wear": [
-            tool_wear
-        ]
-
-    })
-
-    st.bar_chart(
-        wear_data
-    )
-
-st.divider()
-
-st.header("📈 Dataset Analysis")
-
-
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-
-    "Failure Analysis",
-    "Sensor Analysis",
-    "Failure Types",
-    "Statistics",
-    "Dataset Information"
-
-])
-
-
-# TAB 1 - FAILURE ANALYSIS
-
-with tab1:
-
-    st.subheader(
-        "Machine Failure Distribution"
-    )
-
-    failure_count = (
-        df["Machine failure"]
-        .value_counts()
-        .sort_index()
-    )
-
-    failure_chart = pd.DataFrame({
-
-        "Condition": [
-            "No Failure",
-            "Failure"
-        ],
-
-        "Machines": [
-            failure_count.get(0, 0),
-            failure_count.get(1, 0)
-        ]
-    })
-
-    st.bar_chart(
-        failure_chart.set_index(
-            "Condition"
-        )
-    )
-
-
-# ============================================================
-# PREDICTIVE MAINTENANCE DASHBOARD
-# STREAMLIT WEB APPLICATION
-# ============================================================
 
 import os
 import pickle
 import numpy as np
 import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
 
 
 # ============================================================
-# PAGE CONFIGURATION
+# PAGE CONFIG
 # ============================================================
 
 st.set_page_config(
-    page_title="Predictive Maintenance System",
+    page_title="Predictive Maintenance Dashboard",
     page_icon="⚙️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 
 # ============================================================
-# TITLE
+# CUSTOM CSS
 # ============================================================
 
-st.title("⚙️ Predictive Maintenance System")
+st.markdown(
+    """
+    <style>
 
-st.write(
-    """
-    This dashboard uses machine learning to predict machine failure
-    from sensor parameters and provide a maintenance recommendation.
-    """
+    .main {
+        background-color: #f5f7fa;
+    }
+
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+
+    .dashboard-title {
+        font-size: 42px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .dashboard-subtitle {
+        font-size: 18px;
+        color: #6b7280;
+        margin-bottom: 30px;
+    }
+
+    .status-card {
+        padding: 20px;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 15px;
+    }
+
+    .metric-title {
+        font-size: 14px;
+        color: #6b7280;
+    }
+
+    .metric-value {
+        font-size: 28px;
+        font-weight: 700;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 
 # ============================================================
-# FILE PATHS
+# PATHS
 # ============================================================
 
-MODEL_PATH = (
+MODEL_PATHS = [
+    "models/predictive_maintenance_model.pkl",
     "model/predictive_maintenance_model.pkl"
-)
+]
 
 DATASET_PATH = "ai4i2020.csv"
 
@@ -707,31 +89,56 @@ DATASET_PATH = "ai4i2020.csv"
 # LOAD MODEL
 # ============================================================
 
-if not os.path.exists(MODEL_PATH):
+@st.cache_resource
+def load_model():
+
+    for path in MODEL_PATHS:
+
+        if os.path.exists(path):
+
+            with open(path, "rb") as file:
+                return pickle.load(file)
+
+    return None
+
+
+# ============================================================
+# LOAD DATA
+# ============================================================
+
+@st.cache_data
+def load_dataset():
+
+    if not os.path.exists(DATASET_PATH):
+        return None
+
+    return pd.read_csv(DATASET_PATH)
+
+
+model = load_model()
+df = load_dataset()
+
+
+# ============================================================
+# ERROR HANDLING
+# ============================================================
+
+if model is None:
 
     st.error(
-        """
-        Trained model not found.
+        "Trained model not found."
+    )
 
-        Please run:
-
-        python predictive_maintenance.py
-        """
+    st.info(
+        "Please train your model first and make sure "
+        "predictive_maintenance_model.pkl exists inside "
+        "the models/ folder."
     )
 
     st.stop()
 
 
-with open(MODEL_PATH, "rb") as file:
-
-    model = pickle.load(file)
-
-
-# ============================================================
-# LOAD DATASET
-# ============================================================
-
-if not os.path.exists(DATASET_PATH):
+if df is None:
 
     st.error(
         "ai4i2020.csv was not found."
@@ -740,52 +147,41 @@ if not os.path.exists(DATASET_PATH):
     st.stop()
 
 
-df = pd.read_csv(
-    DATASET_PATH
-)
-
-
 # ============================================================
-# DATASET RANGES
+# CONSTANTS
 # ============================================================
 
-DATASET_RANGES = {
-
-    "Air temperature [K]": (
-        df["Air temperature [K]"].min(),
-        df["Air temperature [K]"].max()
-    ),
-
-    "Process temperature [K]": (
-        df["Process temperature [K]"].min(),
-        df["Process temperature [K]"].max()
-    ),
-
-    "Rotational speed [rpm]": (
-        df["Rotational speed [rpm]"].min(),
-        df["Rotational speed [rpm]"].max()
-    ),
-
-    "Torque [Nm]": (
-        df["Torque [Nm]"].min(),
-        df["Torque [Nm]"].max()
-    ),
-
-    "Tool wear [min]": (
-        df["Tool wear [min]"].min(),
-        df["Tool wear [min]"].max()
-    )
-}
-
-
-# ============================================================
-# MACHINE TYPE
-# ============================================================
-
-type_mapping = {
+TYPE_MAPPING = {
     "L": 0,
     "M": 1,
     "H": 2
+}
+
+
+SENSOR_COLUMNS = [
+    "Air temperature [K]",
+    "Process temperature [K]",
+    "Rotational speed [rpm]",
+    "Torque [Nm]",
+    "Tool wear [min]"
+]
+
+
+FAILURE_COLUMNS = [
+    "TWF",
+    "HDF",
+    "PWF",
+    "OSF",
+    "RNF"
+]
+
+
+FAILURE_NAMES = {
+    "TWF": "Tool Wear Failure",
+    "HDF": "Heat Dissipation Failure",
+    "PWF": "Power Failure",
+    "OSF": "Overstrain Failure",
+    "RNF": "Random Failure"
 }
 
 
@@ -794,7 +190,7 @@ type_mapping = {
 # ============================================================
 
 def maintenance_recommendation(
-    failure_probability,
+    probability,
     tool_wear,
     air_temperature,
     process_temperature,
@@ -845,742 +241,656 @@ def maintenance_recommendation(
         )
 
 
-    if (
-        failure_probability >= 0.75
-        or tool_wear >= 200
-    ):
+    if probability >= 0.75 or tool_wear >= 200:
 
-        status = (
-            "IMMEDIATE MAINTENANCE REQUIRED"
-        )
-
+        status = "IMMEDIATE MAINTENANCE REQUIRED"
         estimated_hours = 0
 
+    elif probability >= 0.50 or tool_wear >= 150:
 
-    elif (
-        failure_probability >= 0.50
-        or tool_wear >= 150
-    ):
-
-        status = (
-            "MAINTENANCE REQUIRED SOON"
-        )
-
+        status = "MAINTENANCE REQUIRED SOON"
         estimated_hours = 10
 
+    elif probability >= 0.25 or tool_wear >= 100:
 
-    elif (
-        failure_probability >= 0.25
-        or tool_wear >= 100
-    ):
-
-        status = (
-            "MAINTENANCE SHOULD BE SCHEDULED"
-        )
-
+        status = "MAINTENANCE SHOULD BE SCHEDULED"
         estimated_hours = 25
-
 
     else:
 
-        status = (
-            "MACHINE CONDITION NORMAL"
-        )
-
+        status = "MACHINE CONDITION NORMAL"
         estimated_hours = 50
 
 
-    return (
-        status,
-        estimated_hours,
-        warnings
+    return status, estimated_hours, warnings
+
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+
+with st.sidebar:
+
+    st.title("⚙️ Predictive Maintenance")
+
+    st.markdown("---")
+
+    page = st.radio(
+        "Navigation",
+        [
+            "🏠 Dashboard",
+            "🔮 Machine Prediction",
+            "📊 Data Analytics",
+            "⚠️ Failure Analysis",
+            "ℹ️ About Project"
+        ]
+    )
+
+    st.markdown("---")
+
+    st.caption(
+        "Machine Learning + Sensor Analytics"
     )
 
 
 # ============================================================
-# SECTION 1 - MACHINE INPUT
+# HEADER
 # ============================================================
 
-st.header("🔧 Machine Sensor Inputs")
-
-st.write(
-    "Enter the current machine operating parameters."
+st.markdown(
+    '<div class="dashboard-title">'
+    '⚙️ Predictive Maintenance Dashboard'
+    '</div>',
+    unsafe_allow_html=True
 )
 
-
-col1, col2, col3 = st.columns(3)
-
-
-# Machine Type
-with col1:
-
-    machine_type = st.selectbox(
-        "Machine Type",
-        ["L", "M", "H"]
-    )
-
-    st.caption(
-        "L = Low, M = Medium, H = High"
-    )
-
-
-# Air Temperature
-with col2:
-
-    air_min, air_max = (
-        DATASET_RANGES[
-            "Air temperature [K]"
-        ]
-    )
-
-    air_temperature = st.number_input(
-        "Air Temperature [K]",
-        min_value=float(
-            round(air_min, 1)
-        ),
-        max_value=float(
-            round(air_max, 1)
-        ),
-        value=float(
-            round(
-                df[
-                    "Air temperature [K]"
-                ].mean(),
-                1
-            )
-        ),
-        step=0.1
-    )
-
-    st.caption(
-        f"Dataset range: {air_min:.1f} - {air_max:.1f} K"
-    )
-
-
-# Process Temperature
-with col3:
-
-    process_min, process_max = (
-        DATASET_RANGES[
-            "Process temperature [K]"
-        ]
-    )
-
-    process_temperature = st.number_input(
-        "Process Temperature [K]",
-        min_value=float(
-            round(process_min, 1)
-        ),
-        max_value=float(
-            round(process_max, 1)
-        ),
-        value=float(
-            round(
-                df[
-                    "Process temperature [K]"
-                ].mean(),
-                1
-            )
-        ),
-        step=0.1
-    )
-
-    st.caption(
-        f"Dataset range: {process_min:.1f} - {process_max:.1f} K"
-    )
-
-
-col4, col5, col6 = st.columns(3)
-
-
-# Rotational Speed
-with col4:
-
-    speed_min, speed_max = (
-        DATASET_RANGES[
-            "Rotational speed [rpm]"
-        ]
-    )
-
-    rotational_speed = st.number_input(
-        "Rotational Speed [rpm]",
-        min_value=float(
-            round(speed_min, 0)
-        ),
-        max_value=float(
-            round(speed_max, 0)
-        ),
-        value=float(
-            round(
-                df[
-                    "Rotational speed [rpm]"
-                ].mean(),
-                0
-            )
-        ),
-        step=1.0
-    )
-
-    st.caption(
-        f"Dataset range: {speed_min:.0f} - {speed_max:.0f} rpm"
-    )
-
-
-# Torque
-with col5:
-
-    torque_min, torque_max = (
-        DATASET_RANGES[
-            "Torque [Nm]"
-        ]
-    )
-
-    torque = st.number_input(
-        "Torque [Nm]",
-        min_value=float(
-            round(torque_min, 1)
-        ),
-        max_value=float(
-            round(torque_max, 1)
-        ),
-        value=float(
-            round(
-                df[
-                    "Torque [Nm]"
-                ].mean(),
-                1
-            )
-        ),
-        step=0.1
-    )
-
-    st.caption(
-        f"Dataset range: {torque_min:.1f} - {torque_max:.1f} Nm"
-    )
-
-
-# Tool Wear
-with col6:
-
-    wear_min, wear_max = (
-        DATASET_RANGES[
-            "Tool wear [min]"
-        ]
-    )
-
-    tool_wear = st.number_input(
-        "Tool Wear [min]",
-        min_value=float(
-            round(wear_min, 0)
-        ),
-        max_value=float(
-            round(wear_max, 0)
-        ),
-        value=float(
-            round(
-                df[
-                    "Tool wear [min]"
-                ].mean(),
-                0
-            )
-        ),
-        step=1.0
-    )
-
-    st.caption(
-        f"Dataset range: {wear_min:.0f} - {wear_max:.0f} min"
-    )
-
-
-# ============================================================
-# SENSOR INPUT TABLE
-# ============================================================
-
-st.subheader("Current Sensor Values")
-
-sensor_table = pd.DataFrame({
-
-    "Parameter": [
-        "Machine Type",
-        "Air Temperature",
-        "Process Temperature",
-        "Rotational Speed",
-        "Torque",
-        "Tool Wear"
-    ],
-
-    "Value": [
-        machine_type,
-        f"{air_temperature:.1f} K",
-        f"{process_temperature:.1f} K",
-        f"{rotational_speed:.0f} rpm",
-        f"{torque:.1f} Nm",
-        f"{tool_wear:.0f} min"
-    ]
-})
-
-st.dataframe(
-    sensor_table,
-    use_container_width=True,
-    hide_index=True
+st.markdown(
+    '<div class="dashboard-subtitle">'
+    'Machine failure prediction and maintenance monitoring system'
+    '</div>',
+    unsafe_allow_html=True
 )
 
 
 # ============================================================
-# PREDICTION BUTTON
+# DASHBOARD PAGE
 # ============================================================
 
-st.divider()
+if page == "🏠 Dashboard":
 
-predict_button = st.button(
-    "🔍 Predict Machine Condition",
-    type="primary",
-    use_container_width=True
-)
+    st.subheader("📌 System Overview")
 
+    total_machines = len(df)
 
-# ============================================================
-# PREDICTION
-# ============================================================
-
-if predict_button:
-
-    type_value = type_mapping[
-        machine_type
-    ]
-
-    input_data = pd.DataFrame(
-
-        [[
-            type_value,
-            air_temperature,
-            process_temperature,
-            rotational_speed,
-            torque,
-            tool_wear
-        ]],
-
-        columns=[
-            "Type",
-            "Air temperature [K]",
-            "Process temperature [K]",
-            "Rotational speed [rpm]",
-            "Torque [Nm]",
-            "Tool wear [min]"
-        ]
+    total_failures = int(
+        df["Machine failure"].sum()
     )
 
+    failure_rate = (
+        total_failures / total_machines
+    ) * 100
 
-    # Prediction
-    prediction = model.predict(
-        input_data
-    )[0]
+    avg_tool_wear = df[
+        "Tool wear [min]"
+    ].mean()
+
+    avg_torque = df[
+        "Torque [Nm]"
+    ].mean()
 
 
-    # Probability
-    probability = model.predict_proba(
-        input_data
-    )[0][1]
+    col1, col2, col3, col4 = st.columns(4)
 
 
-    # Maintenance
-    status, estimated_hours, warnings = (
-        maintenance_recommendation(
-            probability,
-            tool_wear,
-            air_temperature,
-            process_temperature,
-            torque,
-            rotational_speed
+    with col1:
+
+        st.metric(
+            "Total Machines",
+            f"{total_machines:,}"
         )
+
+
+    with col2:
+
+        st.metric(
+            "Recorded Failures",
+            f"{total_failures:,}"
+        )
+
+
+    with col3:
+
+        st.metric(
+            "Failure Rate",
+            f"{failure_rate:.2f}%"
+        )
+
+
+    with col4:
+
+        st.metric(
+            "Average Tool Wear",
+            f"{avg_tool_wear:.1f} min"
+        )
+
+
+    st.markdown("---")
+
+
+    # --------------------------------------------------------
+    # FAILURE DISTRIBUTION
+    # --------------------------------------------------------
+
+    col1, col2 = st.columns(2)
+
+
+    with col1:
+
+        failure_counts = pd.DataFrame({
+            "Condition": [
+                "Normal",
+                "Failure"
+            ],
+            "Machines": [
+                int((df["Machine failure"] == 0).sum()),
+                int((df["Machine failure"] == 1).sum())
+            ]
+        })
+
+
+        fig = px.bar(
+            failure_counts,
+            x="Condition",
+            y="Machines",
+            title="Machine Failure Distribution",
+            text="Machines"
+        )
+
+        fig.update_layout(
+            showlegend=False
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+
+    # --------------------------------------------------------
+    # MACHINE TYPES
+    # --------------------------------------------------------
+
+    with col2:
+
+        type_counts = (
+            df["Type"]
+            .value_counts()
+            .reset_index()
+        )
+
+        type_counts.columns = [
+            "Type",
+            "Machines"
+        ]
+
+        type_counts["Type"] = (
+            type_counts["Type"]
+            .map({
+                0: "L",
+                1: "M",
+                2: "H",
+                "L": "L",
+                "M": "M",
+                "H": "H"
+            })
+        )
+
+
+        fig = px.pie(
+            type_counts,
+            names="Type",
+            values="Machines",
+            title="Machine Type Distribution",
+            hole=0.4
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+
+    # --------------------------------------------------------
+    # SENSOR OVERVIEW
+    # --------------------------------------------------------
+
+    st.subheader("📈 Sensor Overview")
+
+
+    sensor_means = pd.DataFrame({
+        "Sensor": [
+            "Air Temperature",
+            "Process Temperature",
+            "Rotational Speed",
+            "Torque",
+            "Tool Wear"
+        ],
+
+        "Average": [
+            df["Air temperature [K]"].mean(),
+            df["Process temperature [K]"].mean(),
+            df["Rotational speed [rpm]"].mean(),
+            df["Torque [Nm]"].mean(),
+            df["Tool wear [min]"].mean()
+        ]
+    })
+
+
+    fig = px.bar(
+        sensor_means,
+        x="Sensor",
+        y="Average",
+        title="Average Sensor Values"
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
     )
 
 
-    # ========================================================
-    # RESULTS
-    # ========================================================
+# ============================================================
+# MACHINE PREDICTION PAGE
+# ============================================================
 
-    st.header("📊 Prediction Result")
+elif page == "🔮 Machine Prediction":
 
-    result_col1, result_col2, result_col3 = (
-        st.columns(3)
+    st.subheader(
+        "🔮 Predict Machine Condition"
+    )
+
+    st.write(
+        "Enter the current machine sensor readings."
     )
 
 
-    with result_col1:
+    # --------------------------------------------------------
+    # INPUTS
+    # --------------------------------------------------------
 
-        if prediction == 1:
+    col1, col2, col3 = st.columns(3)
 
-            st.error(
-                "⚠️ MACHINE FAILURE DETECTED"
+
+    with col1:
+
+        machine_type = st.selectbox(
+            "Machine Type",
+            ["L", "M", "H"]
+        )
+
+
+    with col2:
+
+        air_temperature = st.number_input(
+            "Air Temperature [K]",
+            min_value=float(
+                df["Air temperature [K]"].min()
+            ),
+            max_value=float(
+                df["Air temperature [K]"].max()
+            ),
+            value=float(
+                df["Air temperature [K]"].mean()
+            ),
+            step=0.1
+        )
+
+
+    with col3:
+
+        process_temperature = st.number_input(
+            "Process Temperature [K]",
+            min_value=float(
+                df["Process temperature [K]"].min()
+            ),
+            max_value=float(
+                df["Process temperature [K]"].max()
+            ),
+            value=float(
+                df["Process temperature [K]"].mean()
+            ),
+            step=0.1
+        )
+
+
+    col1, col2, col3 = st.columns(3)
+
+
+    with col1:
+
+        rotational_speed = st.number_input(
+            "Rotational Speed [rpm]",
+            min_value=float(
+                df["Rotational speed [rpm]"].min()
+            ),
+            max_value=float(
+                df["Rotational speed [rpm]"].max()
+            ),
+            value=float(
+                df["Rotational speed [rpm]"].mean()
+            ),
+            step=1.0
+        )
+
+
+    with col2:
+
+        torque = st.number_input(
+            "Torque [Nm]",
+            min_value=float(
+                df["Torque [Nm]"].min()
+            ),
+            max_value=float(
+                df["Torque [Nm]"].max()
+            ),
+            value=float(
+                df["Torque [Nm]"].mean()
+            ),
+            step=0.1
+        )
+
+
+    with col3:
+
+        tool_wear = st.number_input(
+            "Tool Wear [min]",
+            min_value=float(
+                df["Tool wear [min]"].min()
+            ),
+            max_value=float(
+                df["Tool wear [min]"].max()
+            ),
+            value=float(
+                df["Tool wear [min]"].mean()
+            ),
+            step=1.0
+        )
+
+
+    st.markdown("---")
+
+
+    predict = st.button(
+        "🔍 Predict Machine Condition",
+        type="primary",
+        use_container_width=True
+    )
+
+
+    if predict:
+
+        input_data = pd.DataFrame(
+            [[
+                TYPE_MAPPING[machine_type],
+                air_temperature,
+                process_temperature,
+                rotational_speed,
+                torque,
+                tool_wear
+            ]],
+
+            columns=[
+                "Type",
+                "Air temperature [K]",
+                "Process temperature [K]",
+                "Rotational speed [rpm]",
+                "Torque [Nm]",
+                "Tool wear [min]"
+            ]
+        )
+
+
+        prediction = model.predict(
+            input_data
+        )[0]
+
+
+        probability = model.predict_proba(
+            input_data
+        )[0][1]
+
+
+        status, estimated_hours, warnings = (
+            maintenance_recommendation(
+                probability,
+                tool_wear,
+                air_temperature,
+                process_temperature,
+                torque,
+                rotational_speed
             )
+        )
+
+
+        # ----------------------------------------------------
+        # RESULT CARDS
+        # ----------------------------------------------------
+
+        st.markdown("---")
+
+        st.subheader(
+            "📊 Prediction Result"
+        )
+
+
+        col1, col2, col3 = st.columns(3)
+
+
+        with col1:
+
+            if prediction == 1:
+
+                st.error(
+                    "⚠️ MACHINE FAILURE DETECTED"
+                )
+
+            else:
+
+                st.success(
+                    "✅ MACHINE CONDITION NORMAL"
+                )
+
+
+        with col2:
+
+            st.metric(
+                "Failure Probability",
+                f"{probability * 100:.2f}%"
+            )
+
+
+        with col3:
+
+            if estimated_hours == 0:
+
+                st.metric(
+                    "Maintenance",
+                    "IMMEDIATE"
+                )
+
+            else:
+
+                st.metric(
+                    "Estimated Maintenance",
+                    f"{estimated_hours} hours"
+                )
+
+
+        # ----------------------------------------------------
+        # FAILURE PROBABILITY GAUGE
+        # ----------------------------------------------------
+
+        st.subheader(
+            "🎯 Failure Probability"
+        )
+
+
+        gauge = go.Figure(
+            go.Indicator(
+                mode="gauge+number",
+                value=probability * 100,
+                number={
+                    "suffix": "%"
+                },
+                title={
+                    "text": "Failure Risk"
+                },
+                gauge={
+                    "axis": {
+                        "range": [0, 100]
+                    },
+                    "threshold": {
+                        "line": {
+                            "width": 4
+                        },
+                        "value": 75
+                    }
+                }
+            )
+        )
+
+
+        gauge.update_layout(
+            height=350
+        )
+
+
+        st.plotly_chart(
+            gauge,
+            use_container_width=True
+        )
+
+
+        # ----------------------------------------------------
+        # MAINTENANCE
+        # ----------------------------------------------------
+
+        st.subheader(
+            "🔧 Maintenance Assessment"
+        )
+
+
+        if status == "IMMEDIATE MAINTENANCE REQUIRED":
+
+            st.error(status)
+
+        elif status == "MAINTENANCE REQUIRED SOON":
+
+            st.warning(status)
+
+        elif status == "MAINTENANCE SHOULD BE SCHEDULED":
+
+            st.info(status)
+
+        else:
+
+            st.success(status)
+
+
+        # ----------------------------------------------------
+        # WARNINGS
+        # ----------------------------------------------------
+
+        st.subheader(
+            "⚠️ Sensor Warnings"
+        )
+
+
+        if warnings:
+
+            for warning in warnings:
+
+                st.warning(warning)
 
         else:
 
             st.success(
-                "✅ MACHINE CONDITION NORMAL"
+                "No major sensor warnings detected."
             )
 
 
-    with result_col2:
+        # ----------------------------------------------------
+        # SENSOR VALUES
+        # ----------------------------------------------------
+
+        st.subheader(
+            "📡 Current Sensor Values"
+        )
+
+
+        current_values = pd.DataFrame({
+            "Parameter": [
+                "Machine Type",
+                "Air Temperature",
+                "Process Temperature",
+                "Rotational Speed",
+                "Torque",
+                "Tool Wear"
+            ],
+
+            "Value": [
+                machine_type,
+                f"{air_temperature:.2f} K",
+                f"{process_temperature:.2f} K",
+                f"{rotational_speed:.0f} rpm",
+                f"{torque:.2f} Nm",
+                f"{tool_wear:.0f} min"
+            ]
+        })
+
+
+        st.dataframe(
+            current_values,
+            use_container_width=True,
+            hide_index=True
+        )
+
+
+# ============================================================
+# DATA ANALYTICS PAGE
+# ============================================================
+
+elif page == "📊 Data Analytics":
+
+    st.subheader(
+        "📊 Dataset Analytics"
+    )
+
+
+    # --------------------------------------------------------
+    # DATASET METRICS
+    # --------------------------------------------------------
+
+    col1, col2, col3, col4 = st.columns(4)
+
+
+    with col1:
 
         st.metric(
-            "Failure Probability",
-            f"{probability * 100:.2f}%"
-        )
-
-
-    with result_col3:
-
-        if estimated_hours == 0:
-
-            st.metric(
-                "Maintenance",
-                "IMMEDIATE"
-            )
-
-        else:
-
-            st.metric(
-                "Maintenance Estimate",
-                f"{estimated_hours} hours"
-            )
-
-
-    # ========================================================
-    # MAINTENANCE STATUS
-    # ========================================================
-
-    st.subheader(
-        "🔧 Maintenance Assessment"
-    )
-
-    if (
-        status ==
-        "IMMEDIATE MAINTENANCE REQUIRED"
-    ):
-
-        st.error(status)
-
-    elif (
-        status ==
-        "MAINTENANCE REQUIRED SOON"
-    ):
-
-        st.warning(status)
-
-    elif (
-        status ==
-        "MAINTENANCE SHOULD BE SCHEDULED"
-    ):
-
-        st.info(status)
-
-    else:
-
-        st.success(status)
-
-
-    # ========================================================
-    # SENSOR WARNINGS
-    # ========================================================
-
-    st.subheader(
-        "⚠️ Sensor Warnings"
-    )
-
-    if len(warnings) == 0:
-
-        st.success(
-            "No major sensor warning detected."
-        )
-
-    else:
-
-        for warning in warnings:
-
-            st.warning(
-                warning
-            )
-
-
-    # ========================================================
-    # FAILURE PROBABILITY GRAPH
-    # ========================================================
-
-    st.subheader(
-        "Failure Probability"
-    )
-
-    probability_data = pd.DataFrame({
-
-        "Condition": [
-            "No Failure",
-            "Failure"
-        ],
-
-        "Probability": [
-            1 - probability,
-            probability
-        ]
-    })
-
-    st.bar_chart(
-        probability_data.set_index(
-            "Condition"
-        )
-    )
-
-
-    # ========================================================
-    # TOOL WEAR GRAPH
-    # ========================================================
-
-    st.subheader(
-        "Tool Wear Analysis"
-    )
-
-    wear_data = pd.DataFrame({
-
-        "Tool Wear": [
-            tool_wear
-        ]
-
-    })
-
-    st.bar_chart(
-        wear_data
-    )
-
-
-# ============================================================
-# DATASET ANALYSIS
-# ============================================================
-
-st.divider()
-
-st.header("📈 Dataset Analysis")
-
-
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-
-    "Failure Analysis",
-    "Sensor Analysis",
-    "Failure Types",
-    "Statistics",
-    "Dataset Information"
-
-])
-
-
-# ============================================================
-# TAB 1 - FAILURE ANALYSIS
-# ============================================================
-
-with tab1:
-
-    st.subheader(
-        "Machine Failure Distribution"
-    )
-
-    failure_count = (
-        df["Machine failure"]
-        .value_counts()
-        .sort_index()
-    )
-
-    failure_chart = pd.DataFrame({
-
-        "Condition": [
-            "No Failure",
-            "Failure"
-        ],
-
-        "Machines": [
-            failure_count.get(0, 0),
-            failure_count.get(1, 0)
-        ]
-    })
-
-    st.bar_chart(
-        failure_chart.set_index(
-            "Condition"
-        )
-    )
-
-
-# TAB 2 - SENSOR ANALYSIS
-
-with tab2:
-
-    st.subheader(
-        "Sensor Parameter Statistics"
-    )
-
-    sensor_columns = [
-
-        "Air temperature [K]",
-        "Process temperature [K]",
-        "Rotational speed [rpm]",
-        "Torque [Nm]",
-        "Tool wear [min]"
-
-    ]
-
-    sensor_statistics = df[
-        sensor_columns
-    ].describe().T
-
-    st.dataframe(
-        sensor_statistics,
-        use_container_width=True
-    )
-
-# TAB 3 - FAILURE TYPES
-# ============================================================
-
-with tab3:
-
-    st.subheader(
-        "Failure Type Analysis"
-    )
-
-    failure_columns = [
-        "TWF",
-        "HDF",
-        "PWF",
-        "OSF",
-        "RNF"
-    ]
-
-    failure_names = {
-
-        "TWF": "Tool Wear Failure",
-        "HDF": "Heat Dissipation Failure",
-        "PWF": "Power Failure",
-        "OSF": "Overstrain Failure",
-        "RNF": "Random Failure"
-
-    }
-
-    failure_type_data = pd.DataFrame({
-
-        "Failure Code": failure_columns,
-
-        "Failure Type": [
-            failure_names[x]
-            for x in failure_columns
-        ],
-
-        "Number of Cases": [
-            int(df[x].sum())
-            for x in failure_columns
-        ]
-
-    })
-
-    st.dataframe(
-        failure_type_data,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.bar_chart(
-        failure_type_data.set_index(
-            "Failure Code"
-        )["Number of Cases"]
-    )
-
-
-# ============================================================
-# TAB 4 - STATISTICS
-# ============================================================
-
-with tab4:
-
-    st.subheader(
-        "Statistical Analysis"
-    )
-
-    statistical_columns = [
-
-        "Air temperature [K]",
-        "Process temperature [K]",
-        "Rotational speed [rpm]",
-        "Torque [Nm]",
-        "Tool wear [min]"
-
-    ]
-
-    statistics_table = pd.DataFrame({
-
-        "Minimum": [
-            df[column].min()
-            for column in statistical_columns
-        ],
-
-        "Maximum": [
-            df[column].max()
-            for column in statistical_columns
-        ],
-
-        "Mean": [
-            df[column].mean()
-            for column in statistical_columns
-        ],
-
-        "Median": [
-            df[column].median()
-            for column in statistical_columns
-        ],
-
-        "Standard Deviation": [
-            df[column].std()
-            for column in statistical_columns
-        ],
-
-        "Variance": [
-            df[column].var()
-            for column in statistical_columns
-        ]
-
-    }, index=statistical_columns)
-
-    st.dataframe(
-        statistics_table,
-        use_container_width=True
-    )
-
-
-# ============================================================
-# TAB 5 - DATASET INFORMATION
-# ============================================================
-
-with tab5:
-
-    st.subheader(
-        "Dataset Information"
-    )
-
-    info_col1, info_col2, info_col3 = (
-        st.columns(3)
-    )
-
-    with info_col1:
-
-        st.metric(
-            "Number of Rows",
+            "Rows",
             df.shape[0]
         )
 
-    with info_col2:
+
+    with col2:
 
         st.metric(
-            "Number of Columns",
+            "Columns",
             df.shape[1]
         )
 
-    with info_col3:
+
+    with col3:
 
         st.metric(
             "Missing Values",
@@ -1588,228 +898,284 @@ with tab5:
         )
 
 
-    st.subheader(
-        "Dataset Preview"
+    with col4:
+
+        st.metric(
+            "Failure Cases",
+            int(df["Machine failure"].sum())
+        )
+
+
+    st.markdown("---")
+
+
+    # --------------------------------------------------------
+    # SENSOR DISTRIBUTIONS
+    # --------------------------------------------------------
+
+    selected_sensor = st.selectbox(
+        "Select Sensor",
+        SENSOR_COLUMNS
     )
 
-    st.dataframe(
-        df.head(20),
+
+    fig = px.histogram(
+        df,
+        x=selected_sensor,
+        color="Machine failure",
+        nbins=40,
+        title=f"{selected_sensor} Distribution"
+    )
+
+
+    st.plotly_chart(
+        fig,
         use_container_width=True
     )
 
+
+    # --------------------------------------------------------
+    # SENSOR VS FAILURE
+    # --------------------------------------------------------
+
+    fig = px.box(
+        df,
+        x="Machine failure",
+        y=selected_sensor,
+        color="Machine failure",
+        title=f"{selected_sensor} vs Machine Failure"
+    )
+
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+
+
+    # --------------------------------------------------------
+    # CORRELATION
+    # --------------------------------------------------------
+
+    st.subheader(
+        "🔥 Sensor Correlation"
+    )
+
+
+    correlation = df[
+        SENSOR_COLUMNS + ["Machine failure"]
+    ].corr()
+
+
+    fig = px.imshow(
+        correlation,
+        text_auto=True,
+        aspect="auto",
+        title="Correlation Matrix"
+    )
+
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+
+
 # ============================================================
-# INPUT VARIABLE RANGES
+# FAILURE ANALYSIS
 # ============================================================
 
-st.divider()
+elif page == "⚠️ Failure Analysis":
 
-st.header(
-    "📏 Input Variable Ranges"
-)
+    st.subheader(
+        "⚠️ Failure Analysis"
+    )
 
-range_table = pd.DataFrame({
 
-    "Variable": [
+    failure_data = pd.DataFrame({
+        "Failure Code": FAILURE_COLUMNS,
+
+        "Failure Type": [
+            FAILURE_NAMES[x]
+            for x in FAILURE_COLUMNS
+        ],
+
+        "Cases": [
+            int(df[x].sum())
+            for x in FAILURE_COLUMNS
+        ]
+    })
+
+
+    col1, col2 = st.columns(2)
+
+
+    with col1:
+
+        fig = px.bar(
+            failure_data,
+            x="Failure Code",
+            y="Cases",
+            text="Cases",
+            title="Failure Type Frequency"
+        )
+
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+
+    with col2:
+
+        fig = px.pie(
+            failure_data,
+            names="Failure Type",
+            values="Cases",
+            title="Failure Type Distribution"
+        )
+
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+
+    st.dataframe(
+        failure_data,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+    # --------------------------------------------------------
+    # FAILURE RATE BY MACHINE TYPE
+    # --------------------------------------------------------
+
+    st.subheader(
+        "Machine Type vs Failure"
+    )
+
+
+    machine_failure = (
+        df.groupby("Type")["Machine failure"]
+        .mean()
+        .reset_index()
+    )
+
+
+    machine_failure.columns = [
         "Machine Type",
-        "Air Temperature [K]",
-        "Process Temperature [K]",
-        "Rotational Speed [rpm]",
-        "Torque [Nm]",
-        "Tool Wear [min]"
-    ],
-
-    "Minimum": [
-        "L",
-        DATASET_RANGES[
-            "Air temperature [K]"
-        ][0],
-
-        DATASET_RANGES[
-            "Process temperature [K]"
-        ][0],
-
-        DATASET_RANGES[
-            "Rotational speed [rpm]"
-        ][0],
-
-        DATASET_RANGES[
-            "Torque [Nm]"
-        ][0],
-
-        DATASET_RANGES[
-            "Tool wear [min]"
-        ][0]
-    ],
-
-    "Maximum": [
-        "H",
-        DATASET_RANGES[
-            "Air temperature [K]"
-        ][1],
-
-        DATASET_RANGES[
-            "Process temperature [K]"
-        ][1],
-
-        DATASET_RANGES[
-            "Rotational speed [rpm]"
-        ][1],
-
-        DATASET_RANGES[
-            "Torque [Nm]"
-        ][1],
-
-        DATASET_RANGES[
-            "Tool wear [min]"
-        ][1]
+        "Failure Rate"
     ]
 
-})
 
-st.dataframe(
-    range_table,
-    use_container_width=True,
-    hide_index=True
-)
+    machine_failure["Failure Rate"] *= 100
 
 
-# ============================================================
-# MAINTENANCE THRESHOLDS
-# ============================================================
+    machine_failure["Machine Type"] = (
+        machine_failure["Machine Type"]
+        .map({
+            0: "L",
+            1: "M",
+            2: "H",
+            "L": "L",
+            "M": "M",
+            "H": "H"
+        })
+    )
 
-st.header(
-    "🔧 Maintenance Thresholds"
-)
 
-maintenance_table = pd.DataFrame({
+    fig = px.bar(
+        machine_failure,
+        x="Machine Type",
+        y="Failure Rate",
+        text_auto=".2f",
+        title="Failure Rate by Machine Type"
+    )
 
-    "Parameter": [
-        "Failure Probability",
-        "Tool Wear",
-        "Tool Wear",
-        "Tool Wear",
-        "Torque",
-        "Temperature Difference",
-        "Rotational Speed"
-    ],
 
-    "Condition": [
-        "≥ 75%",
-        "≥ 200 min",
-        "≥ 150 min",
-        "≥ 100 min",
-        "> 50 Nm",
-        "> 10 K",
-        "< 1200 rpm"
-    ],
+    fig.update_yaxes(
+        title="Failure Rate (%)"
+    )
 
-    "Action": [
-        "Immediate maintenance",
-        "Immediate maintenance",
-        "Maintenance required soon",
-        "Schedule maintenance",
-        "Sensor warning",
-        "Sensor warning",
-        "Sensor warning"
-    ]
-})
 
-st.dataframe(
-    maintenance_table,
-    use_container_width=True,
-    hide_index=True
-)
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
 
 
 # ============================================================
-# FAILURE TYPE REFERENCE
+# ABOUT PAGE
 # ============================================================
 
-st.header(
-    "📚 Failure Type Reference"
-)
+elif page == "ℹ️ About Project":
 
-failure_reference = pd.DataFrame({
-
-    "Code": [
-        "TWF",
-        "HDF",
-        "PWF",
-        "OSF",
-        "RNF"
-    ],
-
-    "Meaning": [
-        "Tool Wear Failure",
-        "Heat Dissipation Failure",
-        "Power Failure",
-        "Overstrain Failure",
-        "Random Failure"
-    ]
-
-})
-
-st.dataframe(
-    failure_reference,
-    use_container_width=True,
-    hide_index=True
-)
+    st.subheader(
+        "ℹ️ About the Project"
+    )
 
 
-# ============================================================
-# PROJECT INFORMATION
-# ============================================================
+    st.markdown(
+        """
+        ## Predictive Maintenance Using Machine Learning
 
-st.divider()
+        This project uses machine learning to predict whether
+        an industrial machine is likely to experience failure.
 
-st.header(
-    "ℹ️ Project Information"
-)
+        ### Dataset
 
-st.write(
-    """
-    Project Title: Predictive Maintenance Using Machine Learning
+        AI4I 2020 Predictive Maintenance Dataset.
 
-    Dataset: AI4I 2020 Predictive Maintenance Dataset
+        ### Machine Learning Models
 
-    Machine Learning Models:
-    • Logistic Regression
-    • Random Forest
-    • Support Vector Machine (SVM)
+        - Logistic Regression
+        - Random Forest
+        - Support Vector Machine (SVM)
 
-    Input Parameters:
-    • Machine Type
-    • Air Temperature
-    • Process Temperature
-    • Rotational Speed
-    • Torque
-    • Tool Wear
+        ### Sensor Parameters
 
-    Output:
-    • Machine Failure Prediction
-    • Failure Probability
-    • Maintenance Recommendation
-    • Estimated Maintenance Time
-    • Sensor Warnings
-    """
-)
+        - Machine Type
+        - Air Temperature
+        - Process Temperature
+        - Rotational Speed
+        - Torque
+        - Tool Wear
 
-st.info(
-    """
-    Note: The maintenance time values such as 0, 10, 25 and
-    50 operating hours are rule-based estimates created for
-    this project. The AI4I dataset does not contain actual
-    Remaining Useful Life (RUL) or maintenance-history data.
-    """
-)
+        ### Dashboard Outputs
+
+        - Machine failure prediction
+        - Failure probability
+        - Maintenance status
+        - Sensor warnings
+        - Dataset analytics
+        - Failure type analysis
+        """
+    )
+
+
+    st.info(
+        """
+        Important:
+
+        The maintenance time estimates used in this project
+        are rule-based estimates. The AI4I 2020 dataset does
+        not contain actual Remaining Useful Life (RUL) or
+        maintenance-history data.
+        """
+    )
 
 
 # ============================================================
 # FOOTER
 # ============================================================
 
-st.divider()
+st.markdown("---")
 
 st.caption(
-    "Predictive Maintenance System | Machine Learning + Sensor Analytics"
-)   
+    "Predictive Maintenance System | "
+    "Machine Learning + Streamlit"
+)
